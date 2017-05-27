@@ -97,7 +97,8 @@ public let CarthageProjectBinaryAssetPattern = ".framework"
 /// MIME types allowed for GitHub Release assets, for them to be considered as
 /// binary frameworks.
 public let CarthageProjectBinaryAssetContentTypes = [
-	"application/zip"
+	"application/zip",
+	"application/octet-stream"
 ]
 
 /// Describes an event occurring to or with a project.
@@ -568,6 +569,10 @@ public final class Project {
 			})
 	}
 
+	var environmentToken: String? {
+		return ProcessInfo.processInfo.environment["GITHUB_TOKEN"]
+	}
+
 	/// Installs binaries and debug symbols for the given project, if available.
 	///
 	/// Sends a boolean indicating whether binaries were installed.
@@ -584,7 +589,13 @@ public final class Project {
 
 				switch dependency {
 				case let .gitHub(server, repository):
-					let client = Client(server: server)
+					let client: Client
+					if let token = self.environmentToken {
+						client = Client(server, token: token)
+					} else {
+						client = Client(server: server)
+					}
+
 					return self.downloadMatchingBinaries(for: dependency, atRevision: revision, fromRepository: repository, client: client)
 						.flatMapError { error -> SignalProducer<URL, CarthageError> in
 							if !client.isAuthenticated {
@@ -1172,7 +1183,7 @@ private func dSYMForFramework(_ frameworkURL: URL, inDirectoryURL directoryURL: 
 							return dSYMUUIDs == frameworkUUIDs
 						}
 						.map { _ in dSYMURL }
-				}
+			}
 		}
 		.take(first: 1)
 }
